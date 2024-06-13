@@ -1,25 +1,49 @@
 {
   "name": "koishi-plugin-pm2",
-  "description": "",
-  "version": "0.0.1",
+  "description": "PM2 process manager dashboard",
+  "version": "0.1.0",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
     "lib",
     "dist"
   ],
+  "author": "Hieuzest <girkirin@hotmail.com>",
   "license": "MIT",
-  "scripts": {},
   "keywords": [
     "chatbot",
     "koishi",
-    "plugin"
+    "plugin",
+    "pm2"
   ],
-  "devDependencies": {
-    "@koishijs/client": "^5.29.1"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/koikirin/koishi-plugin-pm2.git"
+  },
+  "homepage": "https://github.com/koikirin/koishi-plugin-pm2",
+  "koishi": {
+    "description": {
+      "en": "PM2 process manager",
+      "zh": "PM2 进程管理"
+    },
+    "service": {
+      "required": [
+        "console"
+      ]
+    }
   },
   "peerDependencies": {
-    "@koishijs/plugin-console": "^5.29.1",
-    "koishi": "^4.17.8"
+    "@koishijs/plugin-console": "^5.30.11",
+    "koishi": "^4.18.10"
+  },
+  "dependencies": {
+    "kleur": "^4.1.5",
+    "pm2": "^6.0.14"
+  },
+  "devDependencies": {
+    "@hieuzest/koishi-buildtools": "^1.0.2",
+    "@koishijs/client": "^5.30.11",
+    "@koishijs/plugin-console": "^5.30.11",
+    "ansi_up": "^5.2.1"
   }
 }

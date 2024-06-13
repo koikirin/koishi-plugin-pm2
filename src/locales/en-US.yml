@@ -1,0 +1,43 @@
+pm2:
+  alerts:
+    restart: '[PM2] Process {name} restarted.'
+    delete: '[PM2] Process {name} deleted.'
+    stop: '[PM2] Process {name} stopped.'
+    reload: '[PM2] Process {name} reloaded.'
+    'graceful reload': '[PM2] Process {name} gracefully reloaded.'
+    start: '[PM2] Process {name} started.'
+    exit: '[PM2] Process {name} exited.'
+    online: '[PM2] Process {name} is online.'
+    'restart-overlimit': '[PM2] Process {name} reached restart overlimit.'
+commands:
+  pm2.list:
+    description: Display the list of PM2 processes.
+    messages:
+      output: |
+        - PM2 Process List
+        {context.map(proc => '[' + String(proc.pm_id) + '] ' + proc.name + ' ' + proc.pm2_env.status + (proc.pm2_env.status === 'online' ? ' ' + String(Math.floor((Date.now() - proc.pm2_env.pm_uptime) / 1000 / 60 / 60 / 24)) + 'd' : '')).join('\n')}
+  pm2.start:
+    description: Start a PM2 process by id or name.
+    messages:
+      output: 'Process {name} started.'
+      not-found: 'Process {id} not found.'
+  pm2.restart:
+    description: Restart a PM2 process by id or name.
+    messages:
+      output: 'Process {name} restarted.'
+      not-found: 'Process {id} not found.'
+  pm2.reload:
+    description: Reload a PM2 process by id or name.
+    messages:
+      output: 'Process {name} reloaded.'
+      not-found: 'Process {id} not found.'
+  pm2.stop:
+    description: Stop a PM2 process by id or name.
+    messages:
+      output: 'Process {name} stopped.'
+      not-found: 'Process {id} not found.'
+  pm2.delete:
+    description: Delete a PM2 process by id or name.
+    messages:
+      output: 'Process {name} deleted.'
+      not-found: 'Process {id} not found.'
