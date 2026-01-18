@@ -2,9 +2,11 @@ name: Publish
 
 on:
   push:
-    braches:
+    branches:
       - main
       - master
+    tags:
+      - 'v*'
 
 jobs:
   publish_npm:

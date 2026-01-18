@@ -3,7 +3,7 @@
     <div v-if="loading" class="action-dialog-loading">
       <el-skeleton :rows="3" animated />
     </div>
-    <div v-else class="action-result-list">
+    <el-scrollbar v-else class="action-result-scrollbar" height="60vh" view-class="action-result-list">
       <template v-if="results?.length">
         <div v-for="(entry, idx) in results" :key="`${entry.process?.pm_id ?? 'unknown'}-${entry.process?.name ?? idx}`"
           class="action-result-row">
@@ -15,7 +15,7 @@
         </div>
       </template>
       <p v-else class="section-empty">No response received.</p>
-    </div>
+    </el-scrollbar>
   </el-dialog>
 </template>
 
@@ -70,14 +70,17 @@ const formatActionPayload = (entry: PM2.MonitorActionResult) => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-height: 60vh;
-  overflow-y: auto;
+}
+
+.action-result-scrollbar {
+  margin: 0 -4px;
 }
 
 .action-result-row {
-  border: var(--fg2) 1px solid;
+  border: var(--fg3) 1px solid;
   border-radius: 4px;
   padding: 12px 14px;
+  margin: 2px;
 }
 
 .action-result-meta {
@@ -92,5 +95,11 @@ const formatActionPayload = (entry: PM2.MonitorActionResult) => {
   font-size: 13px;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.section-empty {
+  margin: 10px 0 0 0;
+  color: var(--fg2);
+  font-size: 13px;
 }
 </style>

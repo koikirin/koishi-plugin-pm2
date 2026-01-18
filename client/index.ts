@@ -28,9 +28,9 @@ export default (ctx: Context) => {
 
   const schema = Schema.object({
     pm2: Schema.object({
-      enableConfirm: Schema.array(Schema.union(['restart', 'reload', 'stop', 'delete']))
+      enableConfirm: Schema.array(Schema.union(['restart', 'reload', 'stop']))
         .description('Enable confirmation for process actions.')
-        .default(['restart', 'reload', 'stop', 'delete'])
+        .default(['stop'])
         .role('checkbox'),
       refreshInterval: Schema.number()
         .description('The interval (in milliseconds) to refresh the process list.')

@@ -85,8 +85,8 @@
           </template>
         </el-table-column>
         <!-- <el-table-column prop="pm_id" label="ID" /> -->
-        <el-table-column prop="name" label="Name" />
-        <el-table-column prop="pm2_env.status" label="Status" min-width="160">
+        <el-table-column prop="name" label="Process" />
+        <el-table-column prop="pm2_env.status" label="Status" min-width="120">
           <template #default="{ row: process }">
             <div class="status-cell">
               <el-tag :type="statusType(process.pm2_env.status)" :effect="mode">{{ process.pm2_env.status }}</el-tag>
@@ -121,15 +121,16 @@
         <el-table-column label="Actions">
           <template #default="{ row: process }">
             <el-button-group>
-              <el-button size="small" title="Restart" aria-label="Restart"
+              <el-button size="small" type="primary" title="Restart" aria-label="Restart"
                 @click="performAction(process, 'restart')">&#8635;</el-button>
-              <el-button size="small" title="Reload" aria-label="Reload"
+              <el-button size="small" type="success" title="Reload" aria-label="Reload"
                 @click="performAction(process, 'reload')">&#8634;</el-button>
-              <el-button size="small" title="Stop" aria-label="Stop"
+              <el-button size="small" type="danger" title="Stop" aria-label="Stop"
                 @click="performAction(process, 'stop')">&#9632;</el-button>
-              <el-button size="small" type="danger" title="Delete" aria-label="Delete"
-                @click="performAction(process, 'delete')">&#10006;</el-button>
-              <el-button size="small" title="Logs" aria-label="Logs" @click="showLogs(process)">&#128203;</el-button>
+              <!-- <el-button size="small" type="danger" title="Delete" aria-label="Delete"
+                @click="performAction(process, 'delete')">&#10006;</el-button> -->
+              <el-button size="small" type="info" title="Logs" aria-label="Logs"
+                @click="showLogs(process)">&#9776;</el-button>
             </el-button-group>
           </template>
         </el-table-column>
@@ -256,17 +257,6 @@ const formatUptime = (uptime: number) => {
   if (!uptime) return '-'
   const now = Date.now()
   const diff = now - uptime
-  // const seconds = Math.floor(diff / 1000) % 60
-  // const minutes = Math.floor(diff / (1000 * 60)) % 60
-  // const hours = Math.floor(diff / (1000 * 60 * 60)) % 24
-  // const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-  // let result = ''
-  // if (days) result += `${days}d `
-  // if (hours) result += `${hours}h `
-  // if (minutes) result += `${minutes}m `
-  // result += `${seconds}s`
-  // return result.trim()
-  // do not show layered uptime, only the highest level
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
   if (days) return `${days}d`
   const hours = Math.floor(diff / (1000 * 60 * 60)) % 24
@@ -453,7 +443,7 @@ watch(alertDialogVisible, (visible) => {
 }
 
 .metric-card {
-  border: var(--fg3) 1px solid;
+  border: var(--k-status-divider, var(--k-color-divider-dark)) 1px solid;
   border-radius: 4px;
   padding: 10px;
   flex: 1 1 150px;
@@ -491,7 +481,7 @@ watch(alertDialogVisible, (visible) => {
 }
 
 .action-chip {
-  border: var(--fg3) 1px solid;
+  border: var(--k-status-divider, var(--k-color-divider-dark)) 1px solid;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -518,8 +508,8 @@ watch(alertDialogVisible, (visible) => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   border: var(--fg4, var(--k-color-border)) 1px solid;
   border-radius: 999px;
   font-size: 14px;
@@ -552,7 +542,6 @@ watch(alertDialogVisible, (visible) => {
 
 .alert-table {
   width: 100%;
-  margin-bottom: 8px;
 }
 
 .alert-message {
@@ -577,6 +566,16 @@ watch(alertDialogVisible, (visible) => {
 
 .process-scroll :deep(.el-scrollbar__wrap) {
   overflow-x: hidden;
+}
+
+.el-button--success {
+  --el-button-hover-text-color: var(--k-color-success);
+  --el-button-hover-border-color: var(--k-color-success);
+}
+
+.el-button--info {
+  --el-button-hover-text-color: var(--k-color-info);
+  --el-button-hover-border-color: var(--k-color-info);
 }
 
 .el-button--danger {
