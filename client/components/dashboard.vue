@@ -328,6 +328,16 @@ const showLogs = async (process?: ProcessRow) => {
   }
 }
 
+watch(logsDialogVisible, (visible) => {
+  if (!visible && current.value) {
+    send('pm2/stop-log', current.value.pm_id ?? 'PM2').catch(err => {
+      console.error('Failed to stop PM2 log', err)
+    })
+    current.value = undefined
+    logsData.value = []
+  }
+})
+
 receive('pm2/patch-log', (args) => {
   const [id, newLogs]: [number, string[]] = args
   logsData.value.push(...newLogs.map(item => ({ data: item })))

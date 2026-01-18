@@ -216,6 +216,8 @@ export class PM2 extends Service {
           process: PM2.Env
           at: number
         }) => {
+          if (that.config.ignoreStoppingExit && packet.event === 'exit' && packet.process.status === 'stopping') return
+          if (that.config.ignoreStoppedExit && packet.event === 'exit' && packet.process.status === 'stopped') return
           this.ctx.emit(packet, 'pm2/process-event', packet.event, packet.process, packet.manually)
         })
 
@@ -426,6 +428,8 @@ export namespace PM2 {
     listSyncTimeout: number
     actionTimeout: number
     logTailLines: number
+    ignoreStoppingExit: boolean
+    ignoreStoppedExit: boolean
   }
 
   export const Config: Schema<Config> = Schema.object({
@@ -445,6 +449,8 @@ export namespace PM2 {
     listSyncTimeout: Schema.number().description('The timeout (in milliseconds) acts as heartbeat for clients requesting process list.').default(30000),
     actionTimeout: Schema.number().description('The timeout (in milliseconds) for PM2 monitor actions.').default(10000),
     logTailLines: Schema.number().description('The number of log lines to tail when starting log streaming.').default(100),
+    ignoreStoppingExit: Schema.boolean().description('Disable exit alerts when a process is stopping.').default(true),
+    ignoreStoppedExit: Schema.boolean().description('Disable exit alerts when a process has stopped.').default(false),
   })
 
   export interface Env {
