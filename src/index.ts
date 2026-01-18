@@ -91,7 +91,7 @@ class LogManager {
         const buffer = this.buffers[id].splice(0)
         const toRemoved: string[] = []
         Object.values(this.ctx.console.clients).filter(client => this.listeners[id].has(client.id)).forEach(client => {
-          if (client.pm2?.lastHeartbeat && Date.now() - client.pm2.lastHeartbeat > 30000) {
+          if (client.pm2?.lastHeartbeat && Date.now() - client.pm2.lastHeartbeat > this.pm2.config.listSyncTimeout) {
             toRemoved.push(client.id)
             return
           }
@@ -423,6 +423,7 @@ export namespace PM2 {
     alerts: Alert[]
     logSyncInterval: number
     listSyncInterval: number
+    listSyncTimeout: number
     actionTimeout: number
     logTailLines: number
   }
@@ -441,6 +442,7 @@ export namespace PM2 {
     })).description('PM2 process event notifications.').default([]).hidden(),
     logSyncInterval: Schema.number().description('The interval (in milliseconds) to sync logs from PM2.').default(200),
     listSyncInterval: Schema.number().description('The interval (in milliseconds) to sync process list from PM2.').default(1000),
+    listSyncTimeout: Schema.number().description('The timeout (in milliseconds) acts as heartbeat for clients requesting process list.').default(30000),
     actionTimeout: Schema.number().description('The timeout (in milliseconds) for PM2 monitor actions.').default(10000),
     logTailLines: Schema.number().description('The number of log lines to tail when starting log streaming.').default(100),
   })
