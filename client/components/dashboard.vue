@@ -1,7 +1,7 @@
 <template>
   <k-layout menu="pm2">
     <el-scrollbar class="process-scroll">
-      <el-table :data="list" style="width: 100%" row-key="pm_id">
+      <el-table :data="list" style="width: 100%; min-width: 880px" row-key="pm_id">
         <el-table-column type="expand">
           <template #default="{ row: process }">
             <div v-if="process.metrics?.length" class="expand-section">
@@ -575,7 +575,9 @@ watch(alertDialogVisible, (visible) => {
 }
 
 .process-scroll :deep(.el-scrollbar__wrap) {
-  overflow-x: hidden;
+  overflow-x: auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .el-button--success {

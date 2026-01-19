@@ -1,4 +1,3 @@
-import kleur from 'kleur'
 import fs from 'fs'
 
 const DEFAULT_PADDING = '          '
@@ -22,11 +21,11 @@ export namespace LogUtils {
   export function format(entry: AppEntry, line: string) {
     let header = ''
     if (entry.type === 'out') {
-      header = kleur.green(pad(DEFAULT_PADDING, entry.app_name) + ' | ')
+      header = `\u001b[32m${pad(DEFAULT_PADDING, entry.app_name)} | \u001b[39m`
     } else if (entry.type === 'err') {
-      header = kleur.red(pad(DEFAULT_PADDING, entry.app_name) + ' | ')
+      header = `\u001b[31m${pad(DEFAULT_PADDING, entry.app_name)} | \u001b[39m`
     } else {
-      header = kleur.cyan(pad(DEFAULT_PADDING, 'PM2') + ' | ')
+      header = `\u001b[36m${pad(DEFAULT_PADDING, 'PM2')} | \u001b[39m`
     }
     return header + line
   }
