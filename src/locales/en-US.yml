@@ -16,6 +16,11 @@ commands:
       output: |
         - PM2 Process List
         {context.map(proc => '[' + String(proc.pm_id) + '] ' + proc.name + ' ' + proc.pm2_env.status + (proc.pm2_env.status === 'online' ? ' ' + String(Math.floor((Date.now() - proc.pm2_env.pm_uptime) / 1000 / 60 / 60 / 24)) + 'd' : '')).join('\n')}
+  pm2.save:
+    description: Dump process list.
+    messages:
+      success: Success.
+      failed: Failed
   pm2.start:
     description: Start a PM2 process by id or name.
     messages:

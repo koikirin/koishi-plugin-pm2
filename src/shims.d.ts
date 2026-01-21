@@ -434,12 +434,38 @@ declare module 'pm2/lib/API' {
       opts: any,
       jsonVia: string,
       cb: (err: Error | null, procs?: ProcessList) => void
-    ): void;
+    ): void
 
     /// //////////////////////////
     // Additional Methods      //
     // (loaded from other files)//
     /// //////////////////////////
+
+    /**
+     * Trigger a PMX custom action in target application
+     * Custom actions allows to interact with an application
+     *
+     * @method trigger
+     * @param  {String|Number} pm_id       process id or application name
+     * @param  {String}        action_name name of the custom action to trigger
+     * @param  {Mixed}         params      parameter to pass to target action
+     * @param  {Function}      cb          callback
+     */
+    trigger(
+      pm_id: string | number,
+      action_name: string,
+      params: any,
+      cb: (err: Error | null, responses?: any[]) => void
+    ): void
+
+    /**
+     * Dump current processes managed by pm2 into DUMP_FILE_PATH file
+     * @method dump
+     * @param force - Override dump file even when process list is empty
+     * @param cb - Callback
+     */
+    dump(force: boolean, cb?: (err: Error | null, response?: any) => void): void
+    dump(cb?: (err: Error | null, response?: any) => void): void
 
     /**
      * Additional methods loaded from:
@@ -563,26 +589,4 @@ declare module 'pm2/lib/API/Log' {
   export const Log: Log
 
   export default Log
-}
-
-declare module 'pm2/lib/API' {
-
-  export class API {
-    /**
-     * Trigger a PMX custom action in target application
-     * Custom actions allows to interact with an application
-     *
-     * @method trigger
-     * @param  {String|Number} pm_id       process id or application name
-     * @param  {String}        action_name name of the custom action to trigger
-     * @param  {Mixed}         params      parameter to pass to target action
-     * @param  {Function}      cb          callback
-     */
-    trigger(
-      pm_id: string | number,
-      action_name: string,
-      params: any,
-      cb: (err: Error | null, responses?: any[]) => void
-    ): void
-  }
 }

@@ -21,6 +21,10 @@ export default (ctx: Context) => {
   })
 
   ctx.menu('pm2', [{
+    id: '.save',
+    icon: 'save',
+    label: 'Save Process List',
+  }, {
     id: '.log',
     icon: 'pm2:logs',
     label: 'Daemon Logs',

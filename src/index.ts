@@ -19,6 +19,7 @@ declare module '@koishijs/console' {
     'pm2/test-alert'(alert: PM2.Alert): Promise<void>
     'pm2/remove-alert'(alert: PM2.Alert): Promise<void>
     'pm2/clear-alerts'(name: string, events?: string[]): Promise<void>
+    'pm2/save'(): Promise<void>
 
     // Client side events
     'pm2/patch-log'(id: number | string, logs: string[]): void
@@ -327,6 +328,15 @@ export class PM2 extends Service {
       that.ctx.scope.update(that.config, false)
     })
 
+    addListener('pm2/save', () => {
+      return new Promise<void>((resolve, reject) => {
+        that.api.dump((err) => {
+          if (err) return reject(err)
+          resolve()
+        })
+      })
+    })
+
     ctx.on('console/connection', (client: Client) => {
       if (!(client.id in ctx.console.clients)) {
         that.logs.stopAll(client.id)
@@ -339,6 +349,21 @@ export class PM2 extends Service {
       .action(async ({ session }) => {
         const list = await that.list()
         return session.text('.output', list)
+      })
+
+    ctx.command('pm2.save')
+      .action(async ({ session }) => {
+        try {
+          await new Promise<void>((resolve, reject) => {
+            this.api.dump((err) => {
+              if (err) return reject(err)
+              resolve()
+            })
+          })
+        } catch {
+          return session.text('.failed')
+        }
+        return session.text('.success')
       })
 
     for (const action of ['start', 'restart', 'reload', 'stop', 'delete'] as const) {

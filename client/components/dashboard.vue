@@ -548,6 +548,15 @@ const triggerCustomAction = async (process: ProcessRow, action: ActionEntry) => 
   }
 }
 
+ctx.action('pm2.save', {
+  action: () => send('pm2/save').then(() => {
+    ElMessage.success('PM2 process list saved successfully')
+  }).catch(err => {
+    console.error('Failed to save PM2 process list', err)
+    ElMessage.error('Failed to save PM2 process list')
+  })
+})
+
 ctx.action('pm2.log', {
   action: () => showLogs()
 })
