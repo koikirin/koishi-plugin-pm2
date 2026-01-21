@@ -170,6 +170,7 @@ export class PM2 extends Service {
   api: API
   bus: EventEmitter | null = null
   logs: LogManager
+  metricHistory: Map<number, PM2.ProcessHistory> = new Map()
 
   list: () => Promise<PM2.Process[]>
   trigger: (id: number | string, actionName: string) => Promise<PM2.MonitorActionResult[]>
@@ -209,6 +210,14 @@ export class PM2 extends Service {
         })
 
         await that.logs.init()
+
+        if (this.config.metricsInterval) {
+          this.ctx.setInterval(() => {
+            this.recordHistory().catch(err => {
+              this.ctx.logger.warn('failed to record pm2 metrics:', err)
+            })
+          }, this.config.metricsInterval)
+        }
 
         this.bus.on('process:event', (packet: {
           event: string
@@ -252,6 +261,7 @@ export class PM2 extends Service {
       return that.list().then(list => list.map((proc: PM2.Process) => {
         delete proc.pm2_env.env
         proc.alerts = (that.config.alerts || []).filter(alert => alert.name === proc.name || alert.name === '*')
+        proc.history = that.metricHistory.get(proc.pm_id)
         return proc
       }))
     })
@@ -351,6 +361,49 @@ export class PM2 extends Service {
     })
   }
 
+  private async recordHistory() {
+    const list = await this._list()
+    const now = Date.now()
+    const maxSamples = Math.max(1, this.config.metricsHistorySize)
+    const seen = new Set<number>()
+
+    for (const proc of list) {
+      if (!proc?.pm_id) continue
+      const history = this.metricHistory.get(proc.pm_id) ?? { samples: [], monitors: {} }
+
+      if (proc.monit) {
+        history.samples.push({
+          time: now,
+          cpu: proc.monit.cpu ?? 0,
+          memory: proc.monit.memory ?? 0,
+        })
+        if (history.samples.length > maxSamples) {
+          history.samples.splice(0, history.samples.length - maxSamples)
+        }
+      }
+
+      const monitor = proc.pm2_env?.axm_monitor || {}
+      for (const [name, data] of Object.entries(monitor)) {
+        if (!data?.historic) continue
+        const value = typeof data.value === 'number' ? data.value : Number(data.value)
+        if (!Number.isFinite(value)) continue
+        const monitorHistory = history.monitors[name] ?? []
+        monitorHistory.push({ time: now, value })
+        if (monitorHistory.length > maxSamples) {
+          monitorHistory.splice(0, monitorHistory.length - maxSamples)
+        }
+        history.monitors[name] = monitorHistory
+      }
+
+      this.metricHistory.set(proc.pm_id, history)
+      seen.add(proc.pm_id)
+    }
+
+    for (const key of this.metricHistory.keys()) {
+      if (!seen.has(key)) this.metricHistory.delete(key)
+    }
+  }
+
   async _trigger(id: number | string, actionName: string): Promise<any[]> {
     return new Promise<any[]>((resolve, reject) => {
       let counter = 0, processCount = 0, timeout: () => void | null = null
@@ -426,6 +479,8 @@ export namespace PM2 {
     logSyncInterval: number
     listSyncInterval: number
     listSyncTimeout: number
+    metricsInterval: number
+    metricsHistorySize: number
     actionTimeout: number
     logTailLines: number
     ignoreStoppingExit: boolean
@@ -446,8 +501,10 @@ export namespace PM2 {
     })).description('PM2 process event notifications.').default([]).hidden(),
     logSyncInterval: Schema.number().description('The interval (in milliseconds) to sync logs from PM2.').default(200),
     listSyncInterval: Schema.number().description('The interval (in milliseconds) to sync process list from PM2.').default(1000),
-    listSyncTimeout: Schema.number().description('The timeout (in milliseconds) acts as heartbeat for clients requesting process list.').default(30000),
-    actionTimeout: Schema.number().description('The timeout (in milliseconds) for PM2 monitor actions.').default(10000),
+    listSyncTimeout: Schema.number().description('The timeout (in milliseconds) acts as heartbeat for clients requesting process list.').default(1000 * 30),
+    metricsInterval: Schema.number().description('The interval (in milliseconds) to sample CPU/memory metrics.').default(1000 * 60),
+    metricsHistorySize: Schema.number().description('The number of historical metric samples to keep.').default(60),
+    actionTimeout: Schema.number().description('The timeout (in milliseconds) for PM2 monitor actions.').default(1000 * 10),
     logTailLines: Schema.number().description('The number of log lines to tail when starting log streaming.').default(100),
     ignoreStoppingExit: Schema.boolean().description('Disable exit alerts when a process is stopping.').default(true),
     ignoreStoppedExit: Schema.boolean().description('Disable exit alerts when a process has stopped.').default(false),
@@ -517,6 +574,8 @@ export namespace PM2 {
       memory: number
     }
 
+    history?: ProcessHistory
+
     alerts?: Alert[]
   }
 
@@ -532,6 +591,22 @@ export namespace PM2 {
       at?: number
     }
     at: number
+  }
+
+  export interface MetricSample {
+    time: number
+    cpu: number
+    memory: number
+  }
+
+  export interface MonitorSample {
+    time: number
+    value: number
+  }
+
+  export interface ProcessHistory {
+    samples: MetricSample[]
+    monitors: Record<string, MonitorSample[]>
   }
 
 }

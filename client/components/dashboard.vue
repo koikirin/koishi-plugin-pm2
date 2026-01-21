@@ -1,13 +1,14 @@
 <template>
   <k-layout menu="pm2">
     <el-scrollbar class="process-scroll">
-      <el-table :data="list" style="width: 100%; min-width: 880px" row-key="pm_id">
+      <el-table :data="list" style="width: 100%" row-key="pm_id">
         <el-table-column type="expand">
           <template #default="{ row: process }">
             <div v-if="process.metrics?.length" class="expand-section">
               <h4 class="expand-title">Metrics</h4>
               <div class="metrics-container">
-                <div v-for="metric in process.metrics" :key="metric.name" class="metric-card">
+                <div v-for="metric in process.metrics" :key="metric.name" class="metric-card"
+                  :style="monitorStyle(metric)">
                   <div class="metric-name">{{ metric.name }}</div>
                   <div class="metric-value">
                     {{ metric.value }}
@@ -42,20 +43,20 @@
                 </div>
               </div>
               <el-table v-if="process.alerts?.length" :data="process.alerts" size="small" border class="alert-table">
-                <el-table-column prop="event" label="Event" min-width="120">
+                <el-table-column prop="event" label="Event" min-width="80">
                   <template #default="{ row: alert }">
                     <span>{{ alert.event['type'] ?? alert.event }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column prop="sid" label="From" min-width="160" />
-                <el-table-column prop="cid" label="To" min-width="160" />
-                <el-table-column label="Message" min-width="320">
+                <el-table-column prop="sid" label="From" min-width="120" />
+                <el-table-column prop="cid" label="To" min-width="120" />
+                <el-table-column label="Message" min-width="240">
                   <template #default="{ row: alert }">
                     <span v-if="alert.message" class="alert-message">{{ alert.message }}</span>
                     <span v-else class="alert-message placeholder">Default template</span>
                   </template>
                 </el-table-column>
-                <el-table-column label="Actions" min-width="150" align="center">
+                <el-table-column label="Actions" min-width="120" align="center">
                   <template #default="{ row: alert }">
                     <div class="alert-row-actions">
                       <el-button size="small" text title="Send test alert" aria-label="Send test alert"
@@ -85,40 +86,53 @@
           </template>
         </el-table-column>
         <!-- <el-table-column prop="pm_id" label="ID" /> -->
-        <el-table-column prop="name" label="Process" />
-        <el-table-column prop="pm2_env.status" label="Status" min-width="120">
+        <el-table-column prop="name" label="Process" min-width="160">
+          <template #default="{ row: process }">
+            <div class="process-name">
+              <span class="process-title">{{ process.name }}</span>
+              <span class="process-id">#{{ process.pm_id }}</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="pm2_env.status" label="Status" min-width="90" class-name="status-column">
           <template #default="{ row: process }">
             <div class="status-cell">
-              <el-tag :type="statusType(process.pm2_env.status)" :effect="mode">{{ process.pm2_env.status }}</el-tag>
-              <div class="status-badges">
-                <el-tooltip v-if="process.pm2_env.autorestart" content="Auto restart enabled" placement="top">
-                  <span class="status-badge auto" aria-label="Auto restart enabled">&#8635;</span>
-                </el-tooltip>
-                <el-tooltip v-if="process.pm2_env.cron_restart && process.pm2_env.cron_restart != 0"
-                  content="Cron restart configured" placement="top">
-                  <span class="status-badge cron" aria-label="Cron restart configured">⏰︎</span>
-                </el-tooltip>
+              <div class="status-wrap">
+                <el-tag :type="statusType(process.pm2_env.status)" :effect="mode">{{ process.pm2_env.status }}</el-tag>
+                <div class="status-badges">
+                  <el-tooltip v-if="process.pm2_env.autorestart" content="Auto restart enabled" placement="top">
+                    <span class="status-badge auto" aria-label="Auto restart enabled">A</span>
+                  </el-tooltip>
+                  <el-tooltip v-if="process.pm2_env.cron_restart && process.pm2_env.cron_restart != 0"
+                    content="Cron restart configured" placement="top">
+                    <span class="status-badge cron" aria-label="Cron restart configured">C</span>
+                  </el-tooltip>
+                </div>
               </div>
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="pm2_env.pm_uptime" label="Uptime">
+        <el-table-column prop="pm2_env.pm_uptime" label="Uptime" min-width="60">
           <template #default="{ row: process }">
             {{ process.pm2_env.status === 'online' ? formatUptime(process.pm2_env.pm_uptime) : 0 }}
           </template>
         </el-table-column>
-        <el-table-column prop="pm2_env.restart_time" label="Restarts" />
-        <el-table-column prop="monit.cpu" label="CPU">
+        <el-table-column prop="pm2_env.restart_time" label="Restarts" min-width="60" />
+        <el-table-column prop="monit.cpu" label="CPU" min-width="100">
           <template #default="{ row: process }">
-            {{ process.monit.cpu }}%
+            <div class="metric-cell" :style="metricStyle(process, 'cpu')">
+              <span class="metric-text">{{ process.monit.cpu }}%</span>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column prop="monit.memory" label="Memory">
+        <el-table-column prop="monit.memory" label="Memory" min-width="100">
           <template #default="{ row: process }">
-            {{ formatMemory(process.monit.memory) }}
+            <div class="metric-cell" :style="metricStyle(process, 'memory')">
+              <span class="metric-text">{{ formatMemory(process.monit.memory) }}</span>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="Actions">
+        <el-table-column label="Actions" min-width="100">
           <template #default="{ row: process }">
             <el-button-group>
               <el-button size="small" type="primary" title="Restart" aria-label="Restart"
@@ -162,6 +176,13 @@ export type MetricEntry = {
   name: string
   value: unknown
   unit?: string
+  historic?: boolean
+  history?: MetricPoint[]
+}
+
+export type MetricPoint = {
+  time: number
+  value: number
 }
 
 export type ActionEntry = {
@@ -199,6 +220,8 @@ const hydrateProcess = (target: ProcessRow, source: PM2.Process) => {
     name,
     value: data.value,
     unit: data.unit || '',
+    history: data.historic ? source.history?.monitors?.[name] || [] : [],
+    historic: Boolean(data.historic),
   }))
   target.actions = Object.entries(source.pm2_env?.axm_actions || {}).filter(([key, data]) => data?.action_type === 'custom').map(([key, data]) => ({
     name: data.action_name,
@@ -217,9 +240,11 @@ const refresh = async () => {
     const oldProc = oldMap.get(proc.pm_id)
     if (oldProc) {
       hydrateProcess(oldProc, proc)
+      oldProc.history = proc.history
     } else {
       const enriched = { ...proc } as ProcessRow
       hydrateProcess(enriched, proc)
+      enriched.history = proc.history
       list.value.push(enriched)
     }
   }
@@ -230,6 +255,43 @@ const refresh = async () => {
       list.value.splice(i, 1)
     }
   }
+}
+
+const buildSparkline = (values: number[], maxValue: number, color: string) => {
+  if (!values?.length) return ''
+  const width = 120
+  const height = 28
+  const normalized = values.length === 1 ? [values[0], values[0]] : values
+  const step = width / (normalized.length - 1)
+  const points = normalized.map((value, index) => {
+    const x = index * step
+    const y = height - Math.min(1, Math.max(0, value / (maxValue || 1))) * height
+    return `${x},${y}`
+  }).join(' ')
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none"><polyline fill="none" stroke="${color}" stroke-width="2" points="${points}" /></svg>`
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+}
+
+const metricStyle = (process: ProcessRow, type: 'cpu' | 'memory') => {
+  const values = (process.history?.samples || []).map(sample => type === 'cpu' ? sample.cpu : sample.memory)
+  if (!values.length) return {}
+  const maxValue = Math.max(...values, 1)
+  const color = type === 'cpu' ? 'rgba(64, 158, 255, 0.35)' : 'rgba(103, 194, 58, 0.35)'
+  const backgroundImage = buildSparkline(values, maxValue, color)
+  return backgroundImage ? {
+    backgroundImage: `url("${backgroundImage}")`,
+  } : {}
+}
+
+const monitorStyle = (metric: MetricEntry) => {
+  if (!metric.history?.length) return {}
+  const values = metric.history.map(sample => sample.value)
+  const maxValue = Math.max(...values, 1)
+  const color = 'rgba(230, 162, 60, 0.35)'
+  const backgroundImage = buildSparkline(values, maxValue, color)
+  return backgroundImage ? {
+    backgroundImage: `url("${backgroundImage}")`,
+  } : {}
 }
 
 onMounted(async () => {
@@ -480,6 +542,33 @@ watch(alertDialogVisible, (visible) => {
   color: var(--fg2);
 }
 
+.process-name {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  line-height: 1.2;
+}
+
+.process-id {
+  font-size: 11px;
+  color: var(--fg2);
+  letter-spacing: 0.02em;
+}
+
+.metric-cell {
+  position: relative;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+}
+
+.metric-text {
+  position: relative;
+  z-index: 1;
+}
+
 .actions-container {
   display: flex;
   flex-wrap: wrap;
@@ -506,24 +595,44 @@ watch(alertDialogVisible, (visible) => {
   display: flex;
   align-items: center;
   gap: 8px;
+  overflow: visible;
+}
+
+:deep(.status-column),
+:deep(.status-column .cell) {
+  overflow: visible;
+}
+
+.status-wrap {
+  position: relative;
+  display: inline-flex;
+  overflow: visible;
+  padding-top: 4px;
+  padding-right: 4px;
 }
 
 .status-badges {
+  position: absolute;
+  top: -4px;
+  right: -4px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 
 .status-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border: var(--fg4, var(--k-color-border)) 1px solid;
   border-radius: 999px;
-  font-size: 14px;
+  font-size: 10px;
+  font-weight: 700;
   color: var(--fg2);
+  background: var(--bg1);
+  box-shadow: 0 0 0 1px var(--bg2);
 }
 
 .status-badge.auto {
@@ -541,13 +650,17 @@ watch(alertDialogVisible, (visible) => {
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 2px;
   width: 100%;
 }
 
 .alert-row-actions :deep(.el-button) {
   min-width: 32px;
-  padding: 4px 6px;
+  padding: 2px 4px;
+}
+
+.alert-row-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
 
 .alert-table {
