@@ -2,7 +2,7 @@ import { Context, deepEqual, h, isNullable, omit, Schema, Service } from 'koishi
 import EventEmitter from 'events'
 import { resolve } from 'path'
 import { Client, Events } from '@koishijs/plugin-console'
-import API, { ProcessDescription } from 'pm2/lib/API'
+import API from 'pm2/lib/API'
 import { LogUtils } from './api'
 import { parsePlatform, serialized, throttle } from './utils'
 import enUS from './locales/en-US.yml'
@@ -42,9 +42,9 @@ declare module 'koishi' {
 }
 
 class LogManager {
-  private buffers: Record<number, string[]> = {}
-  private listeners: Record<number, Set<string>> = {}
-  private broadcasters: Record<number, () => void> = {}
+  private buffers: Record<string, string[]> = {}
+  private listeners: Record<string, Set<string>> = {}
+  private broadcasters: Record<string, () => void> = {}
 
   constructor(protected ctx: Context, protected pm2: PM2) { }
 
@@ -60,14 +60,19 @@ class LogManager {
       }
     }, type: 'out' | 'err' | 'PM2') => {
       const id = packet.process.pm_id ?? 'PM2'
-      if (!this.listeners[id]) return
+      const targets = [String(id), packet.process.name, packet.process.namespace, 'all']
       const data = packet.data.replace(/\n$/, '')
-      this.buffers[id].push(LogUtils.format({
+      const formatted = LogUtils.format({
         app_name: packet.process.pm_id + '|' + packet.process.name,
         type,
         path: '',
-      }, data))
-      this.broadcasters[id]()
+      }, data)
+      for (const target of targets) {
+        if (!target) continue
+        if (!this.listeners[target]) continue
+        this.buffers[target].push(formatted)
+        this.broadcasters[target]()
+      }
     }
 
     this.pm2.bus.on('log:out', (packet) => onLog(packet, 'out'))
@@ -83,61 +88,62 @@ class LogManager {
   }
 
   async start(id: number | string, cid: string, exclusive?: 'out' | 'err'): Promise<string[]> {
-    this.listeners[id] ||= new Set()
-    if (!this.listeners[id].size) {
-      this.buffers[id] = []
-      this.broadcasters[id] = this.ctx.throttle(() => {
-        if (!this.buffers[id].length) return
-        const buffer = this.buffers[id].splice(0)
+    const key = String(id)
+    this.listeners[key] ||= new Set()
+    if (!this.listeners[key].size) {
+      this.buffers[key] = []
+      this.broadcasters[key] = this.ctx.throttle(() => {
+        if (!this.buffers[key].length) return
+        const buffer = this.buffers[key].splice(0)
         const toRemoved: string[] = []
-        Object.values(this.ctx.console.clients).filter(client => this.listeners[id].has(client.id)).forEach(client => {
+        Object.values(this.ctx.console.clients).filter(client => this.listeners[key].has(client.id)).forEach(client => {
           if (client.pm2?.lastHeartbeat && Date.now() - client.pm2.lastHeartbeat > this.pm2.config.listSyncTimeout) {
             toRemoved.push(client.id)
             return
           }
           client.send({
             type: 'pm2/patch-log',
-            body: [id, buffer],
+            body: [key, buffer],
           })
         })
         toRemoved.forEach(cid => this.stopAll(cid))
       }, 200)
     }
-    this.listeners[id].add(cid)
+    this.listeners[key].add(cid)
 
     if (this.pm2.config.logTailLines) {
       const entries: LogUtils.AppEntry[] = []
 
-      if (id === 'PM2' || id === 'pm2') {
+      if (key === 'PM2' || key === 'pm2') {
         this.pushEntry(entries, {
           path: this.pm2.api.pm2_home + '/pm2.log',
           app_name: 'PM2',
           type: 'PM2',
         })
       } else {
-        const procs = await new Promise<ProcessDescription[]>((resolve, reject) => {
-          this.pm2.api.describe(id, (err, desc) => {
-            if (err) return reject(err)
-            resolve(desc)
-          })
-        })
-
-        for (const proc of procs) {
-          if (proc.pm2_env && (id === 'all' || proc.pm2_env.name === id || proc.pm2_env.pm_id === id)) {
-            if (proc.pm2_env.pm_out_log_path && exclusive !== 'err') {
-              this.pushEntry(entries, {
-                path: proc.pm2_env.pm_out_log_path,
-                app_name: proc.pm2_env.pm_id + '|' + proc.pm2_env.name,
-                type: 'out',
-              })
-            }
-            if (proc.pm2_env.pm_err_log_path && exclusive !== 'out') {
-              this.pushEntry(entries, {
-                path: proc.pm2_env.pm_err_log_path,
-                app_name: proc.pm2_env.pm_id + '|' + proc.pm2_env.name,
-                type: 'err',
-              })
-            }
+        const list = await this.pm2._list()
+        const isAll = key === 'all'
+        const isNumeric = !isNaN(Number(key))
+        for (const proc of list) {
+          if (!proc?.pm2_env) continue
+          const match = isAll
+            || proc.pm2_env.name === key
+            || proc.pm2_env.namespace === key
+            || (isNumeric && proc.pm2_env.pm_id === Number(key))
+          if (!match) continue
+          if (proc.pm2_env.pm_out_log_path && exclusive !== 'err') {
+            this.pushEntry(entries, {
+              path: proc.pm2_env.pm_out_log_path,
+              app_name: proc.pm2_env.pm_id + '|' + proc.pm2_env.name,
+              type: 'out',
+            })
+          }
+          if (proc.pm2_env.pm_err_log_path && exclusive !== 'out') {
+            this.pushEntry(entries, {
+              path: proc.pm2_env.pm_err_log_path,
+              app_name: proc.pm2_env.pm_id + '|' + proc.pm2_env.name,
+              type: 'err',
+            })
           }
         }
       }
@@ -149,17 +155,18 @@ class LogManager {
   }
 
   stop(id: number | string, cid: string) {
-    this.listeners[id]?.delete(cid)
-    if (this.listeners[id]?.size === 0) {
-      delete this.listeners[id]
-      delete this.buffers[id]
-      delete this.broadcasters[id]
+    const key = String(id)
+    this.listeners[key]?.delete(cid)
+    if (this.listeners[key]?.size === 0) {
+      delete this.listeners[key]
+      delete this.buffers[key]
+      delete this.broadcasters[key]
     }
   }
 
   stopAll(cid: string) {
     for (const id in this.listeners) {
-      this.stop(Number(id), cid)
+      this.stop(id, cid)
     }
   }
 }
@@ -170,7 +177,7 @@ export class PM2 extends Service {
   api: API
   bus: EventEmitter | null = null
   logs: LogManager
-  metricHistory: Map<number, PM2.ProcessHistory> = new Map()
+  metricHistory: Map<string, PM2.ProcessHistory> = new Map()
 
   list: () => Promise<PM2.Process[]>
   trigger: (id: number | string, actionName: string) => Promise<PM2.MonitorActionResult[]>
@@ -261,7 +268,7 @@ export class PM2 extends Service {
       return that.list().then(list => list.map((proc: PM2.Process) => {
         delete proc.pm2_env.env
         proc.alerts = (that.config.alerts || []).filter(alert => alert.name === proc.name || alert.name === '*')
-        proc.history = that.metricHistory.get(proc.pm_id)
+        proc.history = that.metricHistory.get(proc.name)
         return proc
       }))
     })
@@ -335,10 +342,10 @@ export class PM2 extends Service {
       })
 
     for (const action of ['start', 'restart', 'reload', 'stop', 'delete'] as const) {
-      ctx.command(`pm2.${action} <id>`)
-        .action(async ({ session }, id) => {
+      ctx.command(`pm2.${action} <key>`)
+        .action(async ({ session }, key) => {
           const procs = await new Promise<PM2.Process[]>((resolve, reject) => {
-            that.api[action](id, (err, res) => {
+            that.api[action](key, (err, res) => {
               if (err) return reject(err)
               resolve(res)
             })
@@ -346,7 +353,7 @@ export class PM2 extends Service {
           if (procs.length) {
             return session.text('.output', procs[0])
           } else {
-            return session.text('.not-found', { id })
+            return session.text('.not-found', [key])
           }
         })
     }
@@ -365,11 +372,11 @@ export class PM2 extends Service {
     const list = await this._list()
     const now = Date.now()
     const maxSamples = Math.max(1, this.config.metricsHistorySize)
-    const seen = new Set<number>()
+    const seen = new Set<string>()
 
     for (const proc of list) {
-      if (!proc?.pm_id) continue
-      const history = this.metricHistory.get(proc.pm_id) ?? { samples: [], monitors: {} }
+      if (!proc?.name) continue
+      const history = this.metricHistory.get(proc.name) ?? { samples: [], monitors: {} }
 
       if (proc.monit) {
         history.samples.push({
@@ -395,8 +402,8 @@ export class PM2 extends Service {
         history.monitors[name] = monitorHistory
       }
 
-      this.metricHistory.set(proc.pm_id, history)
-      seen.add(proc.pm_id)
+      this.metricHistory.set(proc.name, history)
+      seen.add(proc.name)
     }
 
     for (const key of this.metricHistory.keys()) {
@@ -427,7 +434,7 @@ export class PM2 extends Service {
 
       this.api.Client.executeRemote('msgProcess', {
         msg: actionName,
-        ...(isNaN(id as any) ? { name: id } : { id }),
+        name: String(id),
       }, function (err, data) {
         if (err) return reject(err)
         if (!data?.process_count) reject(new Error('No process received command.'))

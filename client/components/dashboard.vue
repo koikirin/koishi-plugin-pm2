@@ -1,10 +1,11 @@
 <template>
   <k-layout menu="pm2">
     <el-scrollbar class="process-scroll">
-      <el-table :data="list" style="width: 100%" row-key="pm_id">
+      <el-table ref="tableRef" :data="groupedRows" style="width: 100%" :row-key="rowKey"
+        :row-class-name="rowClassName" @expand-change="onExpandChange">
         <el-table-column type="expand">
           <template #default="{ row: process }">
-            <div v-if="process.metrics?.length" class="expand-section">
+            <div v-if="!isNamespaceRow(process) && process.metrics?.length" class="expand-section">
               <h4 class="expand-title">Metrics</h4>
               <div class="metrics-container">
                 <div v-for="metric in process.metrics" :key="metric.name" class="metric-card"
@@ -18,7 +19,7 @@
               </div>
             </div>
 
-            <div v-if="process.actions?.length" class="expand-section">
+            <div v-if="!isNamespaceRow(process) && process.actions?.length" class="expand-section">
               <h4 class="expand-title">Actions</h4>
               <div class="actions-container">
                 <el-button v-for="action in process.actions" :key="action.name" size="small" class="action-chip" plain
@@ -28,7 +29,7 @@
               </div>
             </div>
 
-            <div class="expand-section">
+            <div v-if="!isNamespaceRow(process)" class="expand-section">
               <div class="expand-header">
                 <h4 class="expand-title">Alerts</h4>
                 <div class="expand-actions">
@@ -88,7 +89,10 @@
         <!-- <el-table-column prop="pm_id" label="ID" /> -->
         <el-table-column prop="name" label="Process" min-width="160">
           <template #default="{ row: process }">
-            <div class="process-name">
+            <div v-if="isNamespaceRow(process)" class="namespace-row">
+              <span class="namespace-name">{{ process.namespace }}</span>
+            </div>
+            <div v-else class="process-name">
               <span class="process-title">{{ process.name }}</span>
               <span class="process-id">#{{ process.pm_id }}</span>
             </div>
@@ -96,7 +100,7 @@
         </el-table-column>
         <el-table-column prop="pm2_env.status" label="Status" min-width="90" class-name="status-column">
           <template #default="{ row: process }">
-            <div class="status-cell">
+            <div v-if="!isNamespaceRow(process)" class="status-cell">
               <div class="status-wrap">
                 <el-tag :type="statusType(process.pm2_env.status)" :effect="mode">{{ process.pm2_env.status }}</el-tag>
                 <div class="status-badges">
@@ -114,37 +118,53 @@
         </el-table-column>
         <el-table-column prop="pm2_env.pm_uptime" label="Uptime" min-width="60">
           <template #default="{ row: process }">
-            {{ process.pm2_env.status === 'online' ? formatUptime(process.pm2_env.pm_uptime) : 0 }}
+            <span v-if="!isNamespaceRow(process)">
+              {{ process.pm2_env.status === 'online' ? formatUptime(process.pm2_env.pm_uptime) : 0 }}
+            </span>
           </template>
         </el-table-column>
-        <el-table-column prop="pm2_env.restart_time" label="Restarts" min-width="60" />
+        <el-table-column prop="pm2_env.restart_time" label="Restarts" min-width="60">
+          <template #default="{ row: process }">
+            <span v-if="!isNamespaceRow(process)">{{ process.pm2_env.restart_time }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="monit.cpu" label="CPU" min-width="100">
           <template #default="{ row: process }">
-            <div class="metric-cell" :style="metricStyle(process, 'cpu')">
+            <div v-if="!isNamespaceRow(process)" class="metric-cell" :style="metricStyle(process, 'cpu')">
               <span class="metric-text">{{ process.monit.cpu }}%</span>
             </div>
           </template>
         </el-table-column>
         <el-table-column prop="monit.memory" label="Memory" min-width="100">
           <template #default="{ row: process }">
-            <div class="metric-cell" :style="metricStyle(process, 'memory')">
+            <div v-if="!isNamespaceRow(process)" class="metric-cell" :style="metricStyle(process, 'memory')">
               <span class="metric-text">{{ formatMemory(process.monit.memory) }}</span>
             </div>
           </template>
         </el-table-column>
         <el-table-column label="Actions" min-width="100">
           <template #default="{ row: process }">
-            <el-button-group>
+            <el-button-group v-if="!isNamespaceRow(process)">
               <el-button size="small" type="primary" title="Restart" aria-label="Restart"
-                @click="performAction(process, 'restart')">&#8635;</el-button>
+                @click="performAction(process.name, 'restart')">&#8635;</el-button>
               <el-button size="small" type="success" title="Reload" aria-label="Reload"
-                @click="performAction(process, 'reload')">&#8634;</el-button>
+                @click="performAction(process.name, 'reload')">&#8634;</el-button>
               <el-button size="small" type="danger" title="Stop" aria-label="Stop"
-                @click="performAction(process, 'stop')">&#9632;</el-button>
+                @click="performAction(process.name, 'stop')">&#9632;</el-button>
               <!-- <el-button size="small" type="danger" title="Delete" aria-label="Delete"
-                @click="performAction(process, 'delete')">&#10006;</el-button> -->
+                @click="performAction(process.name, 'delete')">&#10006;</el-button> -->
               <el-button size="small" type="info" title="Logs" aria-label="Logs"
-                @click="showLogs(process)">&#9776;</el-button>
+                @click="showLogs(process.name)">&#9776;</el-button>
+            </el-button-group>
+            <el-button-group v-else>
+              <el-button size="small" type="primary" title="Restart" aria-label="Restart"
+                @click="performAction(process.namespace, 'restart')">&#8635;</el-button>
+              <el-button size="small" type="success" title="Reload" aria-label="Reload"
+                @click="performAction(process.namespace, 'reload')">&#8634;</el-button>
+              <el-button size="small" type="danger" title="Stop" aria-label="Stop"
+                @click="performAction(process.namespace, 'stop')">&#9632;</el-button>
+              <el-button size="small" type="info" title="Logs" aria-label="Logs"
+                @click="showLogs(process.namespace)">&#9776;</el-button>
             </el-button-group>
           </template>
         </el-table-column>
@@ -163,7 +183,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { send, receive, useContext, useConfig, useColorMode } from '@koishijs/client'
 import { PM2 } from 'koishi-plugin-pm2'
@@ -202,6 +222,100 @@ const mode = useColorMode()
 
 const list = ref<ProcessRow[]>([])
 const current = ref<ProcessRow>()
+const collapsedNamespaces = ref(new Set<string>())
+const expandedProcessKeys = ref(new Set<string>())
+const tableRef = ref()
+const isSyncingExpansion = ref(false)
+const namespaceRows = ref(new Map<string, NamespaceRow>())
+
+type NamespaceRow = {
+  kind: 'namespace'
+  namespace: string
+}
+
+const isNamespaceRow = (row: ProcessRow | NamespaceRow): row is NamespaceRow => {
+  return (row as NamespaceRow).kind === 'namespace'
+}
+
+const rowClassName = ({ row }: { row: ProcessRow | NamespaceRow }) => {
+  return isNamespaceRow(row) ? 'namespace-row' : ''
+}
+
+const rowKey = (row: ProcessRow | NamespaceRow) => {
+  return isNamespaceRow(row) ? `namespace:${row.namespace}` : row.name
+}
+
+const getNamespaceRow = (namespace: string): NamespaceRow => {
+  const cached = namespaceRows.value.get(namespace)
+  if (cached) return cached
+  const created = { kind: 'namespace', namespace } as NamespaceRow
+  namespaceRows.value.set(namespace, created)
+  return created
+}
+
+const groupedRows = computed<Array<ProcessRow | NamespaceRow>>(() => {
+  const map = new Map<string, ProcessRow[]>()
+  for (const proc of list.value) {
+    const ns = proc.pm2_env?.namespace || 'default'
+    const bucket = map.get(ns) || []
+    bucket.push(proc)
+    map.set(ns, bucket)
+  }
+
+  const result: Array<ProcessRow | NamespaceRow> = []
+  const namespaces = Array.from(map.keys()).sort()
+  for (const ns of namespaces) {
+    result.push(getNamespaceRow(ns))
+    if (collapsedNamespaces.value.has(ns)) continue
+    const procs = map.get(ns) || []
+    procs.sort((a, b) => a.name.localeCompare(b.name))
+    result.push(...procs)
+  }
+  return result
+})
+
+const syncExpansion = async () => {
+  if (isSyncingExpansion.value) return
+  isSyncingExpansion.value = true
+  try {
+    await nextTick()
+    const table = tableRef.value
+    if (!table) return
+    for (const row of groupedRows.value) {
+      if (isNamespaceRow(row)) {
+        const expanded = !collapsedNamespaces.value.has(row.namespace)
+        table.toggleRowExpansion?.(row, expanded)
+      } else {
+        const expanded = expandedProcessKeys.value.has(row.name)
+        table.toggleRowExpansion?.(row, expanded)
+      }
+    }
+  } finally {
+    isSyncingExpansion.value = false
+  }
+}
+
+const onExpandChange = (row: ProcessRow | NamespaceRow, expandedRows: Array<ProcessRow | NamespaceRow>) => {
+  if (isSyncingExpansion.value) return
+  const isExpanded = expandedRows.some(item => rowKey(item) === rowKey(row))
+  if (isNamespaceRow(row)) {
+    if (isExpanded) {
+      collapsedNamespaces.value.delete(row.namespace)
+    } else {
+      collapsedNamespaces.value.add(row.namespace)
+    }
+    collapsedNamespaces.value = new Set(collapsedNamespaces.value)
+    syncExpansion()
+    return
+  }
+
+  if (isExpanded) {
+    expandedProcessKeys.value.add(row.name)
+  } else {
+    expandedProcessKeys.value.delete(row.name)
+  }
+  expandedProcessKeys.value = new Set(expandedProcessKeys.value)
+}
 
 const logsDialogVisible = ref(false)
 const logsData = ref<LogRecord[]>([])
@@ -233,11 +347,11 @@ const hydrateProcess = (target: ProcessRow, source: PM2.Process) => {
 const refresh = async () => {
   const newList: PM2.Process[] = await send('pm2/list')
   if (!newList || !newList.length) return
-  const newMap = new Map(newList.map(p => [p.pm_id, p]))
-  const oldMap = new Map(list.value.map(p => [p.pm_id, p]))
+  const newMap = new Map(newList.map(p => [p.name, p]))
+  const oldMap = new Map(list.value.map(p => [p.name, p]))
 
   for (const proc of newList) {
-    const oldProc = oldMap.get(proc.pm_id)
+    const oldProc = oldMap.get(proc.name)
     if (oldProc) {
       hydrateProcess(oldProc, proc)
       oldProc.history = proc.history
@@ -251,10 +365,16 @@ const refresh = async () => {
 
   for (let i = list.value.length - 1; i >= 0; i--) {
     const oldProc = list.value[i]
-    if (!newMap.has(oldProc.pm_id)) {
+    if (!newMap.has(oldProc.name)) {
       list.value.splice(i, 1)
     }
   }
+
+  expandedProcessKeys.value = new Set(
+    Array.from(expandedProcessKeys.value).filter(name => newMap.has(name))
+  )
+
+  syncExpansion()
 }
 
 const buildSparkline = (values: number[], maxValue: number, color: string) => {
@@ -297,6 +417,7 @@ const monitorStyle = (metric: MetricEntry) => {
 onMounted(async () => {
   await refresh()
   timer = window.setInterval(refresh, config.value.pm2?.refreshInterval || 2000)
+  syncExpansion()
 })
 
 onUnmounted(() => {
@@ -336,11 +457,11 @@ const formatMemory = (memory: number) => {
   return `${(memory / 1024 / 1024 / 1024).toFixed(2)} GB`
 }
 
-const performAction = async (process: ProcessRow, action: 'restart' | 'reload' | 'stop' | 'delete') => {
+const performAction = async (name: string, action: 'restart' | 'reload' | 'stop' | 'delete') => {
   if (config.value.pm2?.enableConfirm?.includes(action) ?? true) {
     try {
       await ElMessageBox.confirm(
-        `Are you sure you want to ${action} ${process.name}?`,
+        `Are you sure you want to ${action} ${name}?`,
         'Confirm Action',
         {
           confirmButtonText: 'Confirm',
@@ -353,7 +474,7 @@ const performAction = async (process: ProcessRow, action: 'restart' | 'reload' |
     }
   }
 
-  await send('pm2/action', process.pm_id, action)
+  await send('pm2/action', name, action)
   await refresh()
 }
 
@@ -363,11 +484,11 @@ const triggerCustomAction = async (process: ProcessRow, action: ActionEntry) => 
   actionDialogVisible.value = true
   actionDialogLoading.value = true
   try {
-    const responses = await send('pm2/trigger-action', process.pm_id ?? process.name, action.name)
+    const responses = await send('pm2/trigger-action', process.name, action.name)
     actionData.value = responses || []
   } catch (err) {
     actionData.value = []
-    console.error('Failed to trigger PM2 monitor action', process.pm_id, action.name, err)
+    console.error('Failed to trigger PM2 monitor action', process.name, action.name, err)
     ElMessage.error(`Failed to trigger ${action.name}`)
   } finally {
     actionDialogLoading.value = false
@@ -375,24 +496,19 @@ const triggerCustomAction = async (process: ProcessRow, action: ActionEntry) => 
 }
 
 ctx.action('pm2.log', {
-  action: () => showLogs()
+  action: () => showLogs('PM2')
 })
 
-const showLogs = async (process?: ProcessRow) => {
-  if (process) {
-    current.value = process
-    logsData.value = await send('pm2/start-log', process.pm_id).then(data => data.map(item => ({ data: item })))
-    logsDialogVisible.value = true
-  } else {
-    current.value = { name: 'PM2' } as any
-    logsData.value = await send('pm2/start-log', 'PM2').then(data => data.map(item => ({ data: item })))
-    logsDialogVisible.value = true
-  }
+const showLogs = async (name?: string) => {
+  const target = name || 'PM2'
+  current.value = { name: target } as any
+  logsData.value = await send('pm2/start-log', target).then(data => data.map(item => ({ data: item })))
+  logsDialogVisible.value = true
 }
 
 watch(logsDialogVisible, (visible) => {
   if (!visible && current.value) {
-    send('pm2/stop-log', current.value.pm_id ?? 'PM2').catch(err => {
+    send('pm2/stop-log', current.value.name ?? 'PM2').catch(err => {
       console.error('Failed to stop PM2 log', err)
     })
     current.value = undefined
@@ -477,6 +593,10 @@ watch(alertDialogVisible, (visible) => {
   border-top: var(--k-status-divider, var(--k-color-divider-dark)) 1px solid;
 }
 
+:deep(.el-table__expanded-cell) {
+  padding: 0 !important;
+}
+
 .expand-section:first-of-type {
   border-top: none;
 }
@@ -550,9 +670,44 @@ watch(alertDialogVisible, (visible) => {
 }
 
 .process-id {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--fg2);
-  letter-spacing: 0.02em;
+  // letter-spacing: 0.02em;
+}
+
+.namespace-name {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 600;
+}
+
+:deep(.namespace-row + .el-table__expanded-row) {
+  display: none !important;
+  height: 0 !important;
+  line-height: 0 !important;
+  font-size: 0 !important;
+}
+
+:deep(.namespace-row + .el-table__expanded-row td),
+:deep(.namespace-row + .el-table__expanded-row .cell) {
+  padding: 0 !important;
+  border: 0 !important;
+  height: 0 !important;
+  line-height: 0 !important;
+  font-size: 0 !important;
+}
+
+:deep(.namespace-row td) {
+  border-bottom: 0 !important;
+}
+
+:deep(.namespace-row + .el-table__row td) {
+  border-top: 0 !important;
+}
+
+:deep(.namespace-row) td {
+  padding-top: 4px;
+  padding-bottom: 4px;
 }
 
 .metric-cell {

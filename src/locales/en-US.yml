@@ -20,24 +20,24 @@ commands:
     description: Start a PM2 process by id or name.
     messages:
       output: 'Process {name} started.'
-      not-found: 'Process {id} not found.'
+      not-found: 'Process {0} not found.'
   pm2.restart:
     description: Restart a PM2 process by id or name.
     messages:
       output: 'Process {name} restarted.'
-      not-found: 'Process {id} not found.'
+      not-found: 'Process {0} not found.'
   pm2.reload:
     description: Reload a PM2 process by id or name.
     messages:
       output: 'Process {name} reloaded.'
-      not-found: 'Process {id} not found.'
+      not-found: 'Process {0} not found.'
   pm2.stop:
     description: Stop a PM2 process by id or name.
     messages:
       output: 'Process {name} stopped.'
-      not-found: 'Process {id} not found.'
+      not-found: 'Process {0} not found.'
   pm2.delete:
     description: Delete a PM2 process by id or name.
     messages:
       output: 'Process {name} deleted.'
-      not-found: 'Process {id} not found.'
+      not-found: 'Process {0} not found.'
