@@ -13,14 +13,14 @@
 <script lang="ts" setup>
 
 import { VirtualList } from '@koishijs/client'
-import type { ProcessRow } from './dashboard.vue'
+import type { ProcessRow, NamespaceRow, ClusterRow } from './dashboard.vue'
 import { LogRecord } from '../utils'
 import ansi from 'ansi_up'
 import { computed } from 'vue';
 
 const props = defineProps<{
   visible: boolean
-  process: ProcessRow | undefined
+  process: ProcessRow | NamespaceRow | ClusterRow | undefined
   logs: LogRecord[]
   maxHeight?: string
 }>()
